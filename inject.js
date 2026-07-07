@@ -179,7 +179,7 @@
       <div class="qf-extract-result"></div>
       <div class="qf-toolbar">
         <button class="qf-btn" data-action="paste">📋 粘贴</button>
-        <button class="qf-btn" data-action="voice">🎤 语音输入</button>
+        <!-- 语音按钮已隐藏，手机端请使用键盘上的麦克风 -->
         <button class="qf-btn primary" data-action="fill" disabled>✨ 智能填充</button>
         <button class="qf-btn" data-action="clear" style="margin-left:auto;">清空</button>
       </div>
