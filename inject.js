@@ -175,7 +175,7 @@
         <h3>📋 快捷填写</h3>
         <span class="qf-badge">粘贴 · 语音</span>
       </div>
-      <textarea class="qf-textarea" placeholder="粘贴客户聊天记录、邮件或需求描述，AI自动提取关键信息填写表单…\n\n示例：\n客户：华润数字科技\n项目：能源管理平台二期\n金额：320万\n阶段：方案交流"></textarea>
+      <textarea class="qf-textarea" placeholder="📌 参考格式：把聊天记录/邮件原文粘贴在这里&#10;&#10;示例：&#10;客户：华润数字科技有限公司&#10;项目：能源管理数字化升级项目二期&#10;金额：320万&#10;阶段：商务谈判&#10;联系人：李总"></textarea>
       <div class="qf-extract-result"></div>
       <div class="qf-toolbar">
         <button class="qf-btn" data-action="paste">📋 粘贴</button>
@@ -219,10 +219,16 @@
       }
     });
 
-    // 语音输入按钮
+    // 语音输入按钮 - 兼容多种浏览器
     voiceBtn.addEventListener('click', () => {
-      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        extractResult.textContent = '⚠️ 当前浏览器不支持语音输入，推荐使用Chrome';
+      // 检测可用的语音识别API
+      const SpeechRecognitionAPI = window.SpeechRecognition || 
+                                    window.webkitSpeechRecognition ||
+                                    window.mozSpeechRecognition ||
+                                    window.msSpeechRecognition;
+
+      if (!SpeechRecognitionAPI) {
+        extractResult.textContent = '⚠️ 当前浏览器不支持语音输入。如需使用，请用手机Chrome/Edge浏览器打开';
         extractResult.className = 'qf-extract-result show';
         return;
       }
@@ -232,51 +238,69 @@
         return;
       }
 
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.lang = 'zh-CN';
-      recognition.continuous = false;
-      recognition.interimResults = true;
+      try {
+        recognition = new SpeechRecognitionAPI();
+        recognition.lang = 'zh-CN';
+        recognition.continuous = true;  // 连续识别
+        recognition.interimResults = true;
 
-      recognition.onstart = () => {
-        isRecording = true;
-        voiceBtn.className = 'qf-btn recording';
-        voiceBtn.textContent = '⏹ 结束录音';
-        extractResult.textContent = '🎤 正在录音，请说话…';
-        extractResult.className = 'qf-extract-result show';
-      };
+        recognition.onstart = () => {
+          isRecording = true;
+          voiceBtn.className = 'qf-btn recording';
+          voiceBtn.textContent = '⏹ 点击停止';
+          extractResult.textContent = '🎤 正在录音，请说话… 说完点击"停止"';
+          extractResult.className = 'qf-extract-result show';
+        };
 
-      recognition.onresult = (event) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            textarea.value += transcript;
-          } else {
-            interim = transcript;
+        recognition.onresult = (event) => {
+          let finalText = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              finalText += event.results[i][0].transcript;
+            }
           }
-        }
-        textarea.dispatchEvent(new Event('input'));
-      };
+          if (finalText) {
+            textarea.value += finalText;
+            textarea.dispatchEvent(new Event('input'));
+            textarea.scrollTop = textarea.scrollHeight;
+          }
+        };
 
-      recognition.onend = () => {
-        isRecording = false;
-        voiceBtn.className = 'qf-btn';
-        voiceBtn.textContent = '🎤 语音输入';
-        extractResult.textContent = '✅ 语音输入已完成';
+        recognition.onend = () => {
+          isRecording = false;
+          voiceBtn.className = 'qf-btn';
+          voiceBtn.textContent = '🎤 语音输入';
+          if (textarea.value) {
+            extractResult.textContent = '✅ 语音识别完成';
+            extractResult.className = 'qf-extract-result show';
+            setTimeout(() => { extractResult.className = 'qf-extract-result'; }, 2000);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          isRecording = false;
+          voiceBtn.className = 'qf-btn';
+          voiceBtn.textContent = '🎤 语音输入';
+          
+          let errMsg = '⚠️ 语音识别失败';
+          if (event.error === 'not-allowed') {
+            errMsg = '⚠️ 录音权限被拒绝，请在浏览器设置中允许麦克风权限';
+          } else if (event.error === 'no-speech') {
+            errMsg = '⚠️ 未检测到语音，请检查麦克风是否正常';
+          } else if (event.error === 'network') {
+            errMsg = '⚠️ 语音识别网络连接失败，请检查网络';
+          } else if (event.error === 'aborted') {
+            return; // 用户主动停止，不显示错误
+          }
+          extractResult.textContent = errMsg;
+          extractResult.className = 'qf-extract-result show';
+        };
+
+        recognition.start();
+      } catch (err) {
+        extractResult.textContent = '⚠️ 语音功能启动失败: ' + err.message;
         extractResult.className = 'qf-extract-result show';
-        setTimeout(() => { extractResult.className = 'qf-extract-result'; }, 2000);
-      };
-
-      recognition.onerror = (event) => {
-        isRecording = false;
-        voiceBtn.className = 'qf-btn';
-        voiceBtn.textContent = '🎤 语音输入';
-        extractResult.textContent = '⚠️ 语音识别错误: ' + event.error;
-        extractResult.className = 'qf-extract-result show';
-      };
-
-      recognition.start();
+      }
     });
 
     // 智能填充按钮
