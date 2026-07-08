@@ -368,49 +368,36 @@
     return true;
   }
 
-  // ===== 注入删除按钮到编辑表单 =====
+  // ===== 注入删除按钮到商机卡片（编辑商机按钮下方） =====
   function tryInjectDeleteButton() {
-    // 找所有 .fixed 面板（编辑商机/新建商机弹窗都用这类）
-    var panels = document.querySelectorAll('.fixed');
-    if (panels.length > 0) console.log('🔍 [DELETE-BTN] scanning', panels.length, 'fixed panels');
     var injected = false;
-    for (var i = 0; i < panels.length; i++) {
-      var panel = panels[i];
-      if (panel.querySelector('.hermes-delete-btn')) continue;
-
-      // 找"保存"按钮
-      var btns = panel.querySelectorAll('button');
-      var saveBtn = null;
-      for (var j = 0; j < btns.length; j++) {
-        if (btns[j].textContent.indexOf('保存') >= 0) {
-          saveBtn = btns[j];
-          break;
-        }
-      }
-      if (!saveBtn) continue;
-      console.log('🔍 [DELETE-BTN] found save btn in', panel.tagName, panel.className.slice(0,40));
-
-      // 确保是编辑表单（有输入框）
-      var inputs = panel.querySelectorAll('input');
-      if (inputs.length < 2) continue;
+    // 找所有包含"编辑商机"文本的按钮
+    var allBtns = document.querySelectorAll('button');
+    for (var i = 0; i < allBtns.length; i++) {
+      var btn = allBtns[i];
+      if (btn.textContent.indexOf('编辑商机') === -1) continue;
+      // 确保在卡片/弹窗里，不是导航栏
+      var card = btn.closest('.fixed') || btn.parentElement;
+      if (!card || card.querySelector('.hermes-delete-btn')) continue;
 
       var delBtn = document.createElement('button');
       delBtn.className = 'hermes-delete-btn';
-      delBtn.textContent = '🗑 删除这条商机';
-      delBtn.style.cssText = 'display:block;margin:10px auto 0;padding:8px 20px;border-radius:8px;border:1px solid rgba(255,59,48,0.3);background:transparent;color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;';
+      delBtn.textContent = '🗑 删除商机';
+      delBtn.style.cssText = 'display:block;margin:6px 0 0;padding:8px 20px;border-radius:8px;border:1px solid rgba(255,59,48,0.25);background:transparent;color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;';
+      
+      var oppName = '';
+      var nameEl = card.querySelector('h2, h3, [class*=\"text-17\"], [class*=\"text-16\"]');
+      if (nameEl) oppName = nameEl.textContent.trim();
+      
       delBtn.onclick = function() {
-        var nameInput = panel.querySelector('input');
-        var name = nameInput ? nameInput.value : '';
-        if (!name || !confirm('确定删除「' + name + '」？此操作不可撤销。')) return;
+        var name = oppName || '';
+        if (!name || !confirm('确定删除「' + name + '」？')) return;
         if (typeof window.deleteOpp === 'function') {
           window.deleteOpp(name);
-        } else {
-          alert('删除功能未加载，请刷新页面');
         }
       };
 
-      saveBtn.parentElement.appendChild(delBtn);
-      console.log('🔍 [DELETE-BTN] injected delete button');
+      btn.parentElement.appendChild(delBtn);
       injected = true;
     }
     return injected;
