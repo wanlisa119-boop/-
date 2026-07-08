@@ -370,32 +370,37 @@
 
   // ===== 注入删除按钮到编辑表单 =====
   function tryInjectDeleteButton() {
-    // 只在编辑已有商机时注入（不是新建）
-    var formPanels = document.querySelectorAll('.fixed.inset-0.z-\\\\[80\\\\]');
-    if (!formPanels.length) return false;
+    // 找所有 .fixed 面板（编辑商机/新建商机弹窗都用这类）
+    var panels = document.querySelectorAll('.fixed');
+    if (panels.length > 0) console.log('🔍 [DELETE-BTN] scanning', panels.length, 'fixed panels');
+    var injected = false;
+    for (var i = 0; i < panels.length; i++) {
+      var panel = panels[i];
+      if (panel.querySelector('.hermes-delete-btn')) continue;
 
-    for (var p = 0; p < formPanels.length; p++) {
-      var panel = formPanels[p];
-      if (panel.querySelector('.hermes-delete-btn')) continue; // 已注入
-
-      // 找保存按钮区域
+      // 找"保存"按钮
       var btns = panel.querySelectorAll('button');
       var saveBtn = null;
-      btns.forEach(function(b) {
-        if (b.textContent.trim() === '保存' || b.textContent.indexOf('保存') >= 0) saveBtn = b;
-      });
+      for (var j = 0; j < btns.length; j++) {
+        if (btns[j].textContent.indexOf('保存') >= 0) {
+          saveBtn = btns[j];
+          break;
+        }
+      }
       if (!saveBtn) continue;
+      console.log('🔍 [DELETE-BTN] found save btn in', panel.tagName, panel.className.slice(0,40));
 
-      // 找商机名称（用于 deleteOpp）
-      var nameInput = panel.querySelector('input[placeholder*="商机名称"], input[placeholder*="名称"]');
-      var oppName = nameInput ? nameInput.value : '';
+      // 确保是编辑表单（有输入框）
+      var inputs = panel.querySelectorAll('input');
+      if (inputs.length < 2) continue;
 
       var delBtn = document.createElement('button');
       delBtn.className = 'hermes-delete-btn';
       delBtn.textContent = '🗑 删除这条商机';
-      delBtn.style.cssText = 'display:block;width:100%;margin-top:12px;padding:10px;border-radius:12px;border:none;background:#FF3B30;color:#fff;font-size:15px;font-weight:600;cursor:pointer;';
+      delBtn.style.cssText = 'display:block;width:calc(100% - 40px);margin:16px auto;padding:12px;border-radius:12px;border:none;background:rgba(255,59,48,0.12);color:#FF3B30;font-size:15px;font-weight:600;cursor:pointer;';
       delBtn.onclick = function() {
-        var name = nameInput.value || oppName;
+        var nameInput = panel.querySelector('input');
+        var name = nameInput ? nameInput.value : '';
         if (!name || !confirm('确定删除「' + name + '」？此操作不可撤销。')) return;
         if (typeof window.deleteOpp === 'function') {
           window.deleteOpp(name);
@@ -404,12 +409,15 @@
         }
       };
 
-      // 插到保存按钮区域后面
-      var parent = saveBtn.parentElement;
-      if (parent) parent.appendChild(delBtn);
+      saveBtn.parentElement.appendChild(delBtn);
+      console.log('🔍 [DELETE-BTN] injected delete button');
+      injected = true;
     }
-    return true;
+    return injected;
   }
+
+  // 兜底：每2秒扫描一次
+  setInterval(tryInjectDeleteButton, 2000);
 
   // ===== 持续观察 =====
   function startObserver() {
