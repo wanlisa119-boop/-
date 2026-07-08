@@ -335,6 +335,8 @@
       var newOppIds = new Set();
       var newCliIds = new Set();
 
+      console.log('🔍 [OVERRIDE] setItem called | opps in data:', (data.opportunities||[]).length, '| tracked ids:', window.__supabase_opp_ids ? window.__supabase_opp_ids.size : 'N/A');
+
       // 写入新增/更新的记录
       if (data.opportunities) data.opportunities.forEach(function(o) {
         newOppIds.add(o.id);
