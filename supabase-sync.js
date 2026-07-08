@@ -23,19 +23,28 @@
   // ===== HTTP 请求 =====
   function api(method, path, body) {
     var url = SUPABASE_URL + path;
-    // 用 on_conflict 代替 Prefer header 实现 upsert
-    if (method === 'POST' && body) {
-      url += (path.indexOf('?') >= 0 ? '&' : '?') + 'on_conflict=id';
-    }
+    var headers = {
+      'apikey': ANON_KEY,
+      'Authorization': 'Bearer ' + ANON_KEY,
+      'Content-Type': 'application/json'
+    };
     return fetch(url, {
       method: method,
-      headers: {
-        'apikey': ANON_KEY,
-        'Authorization': 'Bearer ' + ANON_KEY,
-        'Content-Type': 'application/json'
-      },
+      headers: headers,
       body: body ? JSON.stringify(body) : undefined
     }).then(function(r) {
+      // POST 409 → 自动降级为 PATCH 更新
+      if (method === 'POST' && r.status === 409 && body && body.id) {
+        console.log('🔁 409 retry PATCH:', body.id.slice(0,12));
+        return fetch(SUPABASE_URL + path + '?id=eq.' + encodeURIComponent(body.id), {
+          method: 'PATCH',
+          headers: headers,
+          body: JSON.stringify(body)
+        }).then(function(r2) {
+          if (!r2.ok) throw new Error(r2.status + ' ' + (r2.statusText || ''));
+          return r2;
+        });
+      }
       if (!r.ok) throw new Error(r.status + ' ' + (r.statusText || ''));
       return r;
     });
