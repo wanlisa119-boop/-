@@ -291,12 +291,21 @@
       // 写回 localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
-      // 后台清理：本地删了但 Supabase 还留着的"我的"记录
-      window.setTimeout(function() {
-        deleteRemoteOrphans(apiOpps, apiClients, localState);
-        // 也把本地新数据推上去
-        if (localState) writeToSupabase(localState);
-      }, 300);
+      // 立即清理 + 推送（不等 setTimeout）
+      deleteRemoteOrphans(apiOpps, apiClients, localState);
+      // 推本地独有数据到 Supabase
+      var orphansToPush = [];
+      if (localState && localState.opportunities) {
+        var apiOppIds = {};
+        apiOpps.forEach(function(o) { apiOppIds[o.id] = true; });
+        localState.opportunities.forEach(function(o) {
+          if (!apiOppIds[o.id]) orphansToPush.push(o);
+        });
+      }
+      if (orphansToPush.length > 0) {
+        console.log('🔍 [LOAD] pushing', orphansToPush.length, 'local-only opps to Supabase');
+        writeToSupabase({ opportunities: orphansToPush });
+      }
 
       // 记录 ID 集合
       window.__supabase_opp_ids = new Set(state.opportunities.map(function(o) { return o.id; }));
