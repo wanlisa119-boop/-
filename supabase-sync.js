@@ -392,7 +392,8 @@
         .catch(function(e) { console.warn('deleteOpp Supabase fail:', o.id.slice(0,12), e.message); });
     });
     console.log('✅ 已删除', toDelete.length, '条商机:', toDelete.map(function(o) { return o.name; }).join(', '));
-    if (toDelete.length > 0) alert('已删除 ' + toDelete.length + ' 条商机，刷新页面生效');
+    // 自动刷新页面
+    setTimeout(function() { location.reload(); }, 500);
   };
 
 })();

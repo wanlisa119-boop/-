@@ -397,7 +397,7 @@
       var delBtn = document.createElement('button');
       delBtn.className = 'hermes-delete-btn';
       delBtn.textContent = '🗑 删除这条商机';
-      delBtn.style.cssText = 'display:block;width:calc(100% - 40px);margin:16px auto;padding:12px;border-radius:12px;border:none;background:rgba(255,59,48,0.12);color:#FF3B30;font-size:15px;font-weight:600;cursor:pointer;';
+      delBtn.style.cssText = 'display:block;margin:10px auto 0;padding:8px 20px;border-radius:8px;border:1px solid rgba(255,59,48,0.3);background:transparent;color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;';
       delBtn.onclick = function() {
         var nameInput = panel.querySelector('input');
         var name = nameInput ? nameInput.value : '';
