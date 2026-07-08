@@ -1,19 +1,28 @@
 // ==========================================
 // Supabase ↔ localStorage 数据同步桥接
 // 在 app.js 之前加载，实现多人共享
+// 全部使用 XMLHttpRequest（兼容企业微信内置浏览器）
 // ==========================================
 (function() {
   'use strict';
 
   const SUPABASE_URL = 'https://rlfhoacuzvrcdalttxre.supabase.co';
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZmhvYWN1enZyY2RhbHR0eHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDczODksImV4cCI6MjA5ODk4MzM4OX0.rM93L4Xy84TWWdYGdj3oDy7nO4WHcVCw3AJSKiQPwIw';
+  const ANON_KEY = 'eyJhbG...PwIw';
   const STORAGE_KEY = 'opportunity-app-state-v1';
-  const API_HEADERS = {
-    'apikey': ANON_KEY,
-    'Authorization': 'Bearer ' + ANON_KEY,
-    'Content-Type': 'application/json',
-    'Prefer': 'resolution=merge-duplicates'
-  };
+
+  // 通用 XHR 封装（同步）
+  function syncRequest(method, path, body) {
+    var xhr = new XMLHttpRequest();
+    xhr.open(method, SUPABASE_URL + path, false);
+    xhr.setRequestHeader('apikey', ANON_KEY);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + ANON_KEY);
+    if (body) {
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates');
+    }
+    xhr.send(body ? JSON.stringify(body) : null);
+    return xhr;
+  }
 
   // —— 工具函数 ——
   function normalizeOpp(o) {
@@ -77,38 +86,50 @@
   }
 
   // —— 同步计数，用于避免循环触发 ——
-  let syncInProgress = false;
+  var syncInProgress = false;
 
-  // —— 1. 初始加载：从 Supabase 拉数据写入 localStorage（同步 XHR）——
+  // —— 1. 初始加载：从 Supabase 拉数据，合并本地未同步数据 ——
   function loadFromSupabase() {
     try {
-      // 取商机
-      var oppXhr = new XMLHttpRequest();
-      oppXhr.open('GET', SUPABASE_URL + '/rest/v1/opportunities?select=*', false);
-      oppXhr.setRequestHeader('apikey', ANON_KEY);
-      oppXhr.setRequestHeader('Authorization', 'Bearer ' + ANON_KEY);
-      oppXhr.send();
-
+      // 取 Supabase 数据
+      var oppXhr = syncRequest('GET', '/rest/v1/opportunities?select=*');
       if (oppXhr.status !== 200) return false;
       var apiOpps = JSON.parse(oppXhr.responseText);
 
-      // 取客户
-      var cliXhr = new XMLHttpRequest();
-      cliXhr.open('GET', SUPABASE_URL + '/rest/v1/clients?select=*', false);
-      cliXhr.setRequestHeader('apikey', ANON_KEY);
-      cliXhr.setRequestHeader('Authorization', 'Bearer ' + ANON_KEY);
-      cliXhr.send();
-
+      var cliXhr = syncRequest('GET', '/rest/v1/clients?select=*');
       if (cliXhr.status !== 200) return false;
       var apiClients = JSON.parse(cliXhr.responseText);
 
-      // 拼成 App 状态格式
+      // 取本地已有数据（防止手机端写入失败导致数据丢失）
+      var existingStr = localStorage.getItem(STORAGE_KEY);
+      var existing = existingStr ? JSON.parse(existingStr) : null;
+
+      // 从 Supabase 构建状态
       var state = {
         opportunities: apiOpps.map(toAppOpp),
         clients: apiClients.map(toAppClient),
-        currentUser: { name: '用户', department: '', region: '' },
-        theme: 'auto'
+        currentUser: (existing && existing.currentUser) ? existing.currentUser : { name: '用户', department: '', region: '' },
+        theme: (existing && existing.theme) ? existing.theme : 'auto'
       };
+
+      // ★ 合并本地数据：本地有但 Supabase 里没有的 → 保留（防止写入失败丢数据）
+      if (existing) {
+        var serverOppIds = {};
+        state.opportunities.forEach(function(o) { serverOppIds[o.id] = true; });
+        existing.opportunities.forEach(function(localOpp) {
+          if (!serverOppIds[localOpp.id]) {
+            state.opportunities.push(localOpp);
+          }
+        });
+
+        var serverCliIds = {};
+        state.clients.forEach(function(c) { serverCliIds[c.id] = true; });
+        existing.clients.forEach(function(localCli) {
+          if (!serverCliIds[localCli.id]) {
+            state.clients.push(localCli);
+          }
+        });
+      }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
@@ -126,7 +147,7 @@
   // 页面刚加载时执行初始同步
   loadFromSupabase();
 
-  // —— 2. 拦截 localStorage.setItem：写回 Supabase ——
+  // —— 2. 拦截 localStorage.setItem：同步写入 Supabase ——
   var _origSetItem = localStorage.setItem.bind(localStorage);
   localStorage.setItem = function(key, value) {
     _origSetItem(key, value);
@@ -141,50 +162,64 @@
       var currentOppIds = new Set();
       var currentCliIds = new Set();
 
-      // UPSERT 商机
+      // UPSERT 商机（同步 XHR，确保写入成功）
       if (data.opportunities && data.opportunities.length) {
         data.opportunities.forEach(function(opp) {
           currentOppIds.add(opp.id);
           var body = normalizeOpp(opp);
-          fetch(SUPABASE_URL + '/rest/v1/opportunities', {
-            method: 'POST',
-            headers: API_HEADERS,
-            body: JSON.stringify(body)
-          }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
+          try {
+            var res = syncRequest('POST', '/rest/v1/opportunities', body);
+            if (res.status >= 400) {
+              console.error('🟥 Supabase opp write fail:', res.status, body.id);
+            }
+          } catch(e) {
+            console.error('🟥 Supabase opp write error:', e.message, body.id);
+          }
         });
       }
 
-      // UPSERT 客户
+      // UPSERT 客户（同步 XHR）
       if (data.clients && data.clients.length) {
         data.clients.forEach(function(cli) {
           currentCliIds.add(cli.id);
           var body = normalizeClient(cli);
-          fetch(SUPABASE_URL + '/rest/v1/clients', {
-            method: 'POST',
-            headers: API_HEADERS,
-            body: JSON.stringify(body)
-          }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
+          try {
+            var res = syncRequest('POST', '/rest/v1/clients', body);
+            if (res.status >= 400) {
+              console.error('🟥 Supabase client write fail:', res.status, body.id);
+            }
+          } catch(e) {
+            console.error('🟥 Supabase client write error:', e.message, body.id);
+          }
         });
       }
 
-      // 检测并处理删除：被从 localStorage 中移除的记录 → 从 Supabase 删除
+      // 检测并处理删除
       if (window.__supabase_opp_ids) {
         window.__supabase_opp_ids.forEach(function(id) {
           if (!currentOppIds.has(id)) {
-            fetch(SUPABASE_URL + '/rest/v1/opportunities?id=eq.' + id, {
-              method: 'DELETE',
-              headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
-            }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
+            try {
+              var delRes = syncRequest('DELETE', '/rest/v1/opportunities?id=eq.' + id);
+              if (delRes.status >= 400) {
+                console.error('🟥 Supabase opp delete fail:', delRes.status, id);
+              }
+            } catch(e) {
+              console.error('🟥 Supabase opp delete error:', e.message, id);
+            }
           }
         });
       }
       if (window.__supabase_cli_ids) {
         window.__supabase_cli_ids.forEach(function(id) {
           if (!currentCliIds.has(id)) {
-            fetch(SUPABASE_URL + '/rest/v1/clients?id=eq.' + id, {
-              method: 'DELETE',
-              headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
-            }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
+            try {
+              var delRes = syncRequest('DELETE', '/rest/v1/clients?id=eq.' + id);
+              if (delRes.status >= 400) {
+                console.error('🟥 Supabase client delete fail:', delRes.status, id);
+              }
+            } catch(e) {
+              console.error('🟥 Supabase client delete error:', e.message, id);
+            }
           }
         });
       }
