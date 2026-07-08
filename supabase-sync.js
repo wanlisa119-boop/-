@@ -6,7 +6,7 @@
   'use strict';
 
   const SUPABASE_URL = 'https://rlfhoacuzvrcdalttxre.supabase.co';
-  const ANON_KEY = 'eyJhbG...PwIw';
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZmhvYWN1enZyY2RhbHR0eHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDczODksImV4cCI6MjA5ODk4MzM4OX0.rM93L4Xy84TWWdYGdj3oDy7nO4WHcVCw3AJSKiQPwIw';
   const STORAGE_KEY = 'opportunity-app-state-v1';
   const USER_ID_KEY = '__app_user_id';
 
