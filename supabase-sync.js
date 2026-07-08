@@ -24,8 +24,8 @@
       amount: o.amount || 0,
       stage: o.stage || '初步接触',
       contact_person: o.contact || o.contact_person || '',
-      scores: typeof o.scores === 'string' ? o.scores : JSON.stringify(o.scores || {}),
-      risks: typeof o.risks === 'string' ? o.risks : JSON.stringify(o.risks || {}),
+      scores: o.scores || {},
+      risks: o.risks || {},
       notes: o.notes || '',
       owner: o.owner || '',
       created_at: o.createdAt ? new Date(o.createdAt).toISOString() : (o.created_at || new Date().toISOString()),
@@ -150,7 +150,7 @@
             method: 'POST',
             headers: API_HEADERS,
             body: JSON.stringify(body)
-          }).catch(function() {});
+          }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
         });
       }
 
@@ -163,7 +163,7 @@
             method: 'POST',
             headers: API_HEADERS,
             body: JSON.stringify(body)
-          }).catch(function() {});
+          }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
         });
       }
 
@@ -174,7 +174,7 @@
             fetch(SUPABASE_URL + '/rest/v1/opportunities?id=eq.' + id, {
               method: 'DELETE',
               headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
-            }).catch(function() {});
+            }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
           }
         });
       }
@@ -184,7 +184,7 @@
             fetch(SUPABASE_URL + '/rest/v1/clients?id=eq.' + id, {
               method: 'DELETE',
               headers: { 'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY }
-            }).catch(function() {});
+            }).catch(function(e) { console.error('🟥 Supabase APi error:', e.message); });
           }
         });
       }
