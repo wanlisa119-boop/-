@@ -368,13 +368,54 @@
     return true;
   }
 
-  // ===== 持续观察表单出现 =====
+  // ===== 注入删除按钮到编辑表单 =====
+  function tryInjectDeleteButton() {
+    // 只在编辑已有商机时注入（不是新建）
+    var formPanels = document.querySelectorAll('.fixed.inset-0.z-\\\\[80\\\\]');
+    if (!formPanels.length) return false;
+
+    for (var p = 0; p < formPanels.length; p++) {
+      var panel = formPanels[p];
+      if (panel.querySelector('.hermes-delete-btn')) continue; // 已注入
+
+      // 找保存按钮区域
+      var btns = panel.querySelectorAll('button');
+      var saveBtn = null;
+      btns.forEach(function(b) {
+        if (b.textContent.trim() === '保存' || b.textContent.indexOf('保存') >= 0) saveBtn = b;
+      });
+      if (!saveBtn) continue;
+
+      // 找商机名称（用于 deleteOpp）
+      var nameInput = panel.querySelector('input[placeholder*="商机名称"], input[placeholder*="名称"]');
+      var oppName = nameInput ? nameInput.value : '';
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'hermes-delete-btn';
+      delBtn.textContent = '🗑 删除这条商机';
+      delBtn.style.cssText = 'display:block;width:100%;margin-top:12px;padding:10px;border-radius:12px;border:none;background:#FF3B30;color:#fff;font-size:15px;font-weight:600;cursor:pointer;';
+      delBtn.onclick = function() {
+        var name = nameInput.value || oppName;
+        if (!name || !confirm('确定删除「' + name + '」？此操作不可撤销。')) return;
+        if (typeof window.deleteOpp === 'function') {
+          window.deleteOpp(name);
+        } else {
+          alert('删除功能未加载，请刷新页面');
+        }
+      };
+
+      // 插到保存按钮区域后面
+      var parent = saveBtn.parentElement;
+      if (parent) parent.appendChild(delBtn);
+    }
+    return true;
+  }
+
+  // ===== 持续观察 =====
   function startObserver() {
     const observer = new MutationObserver(() => {
-      if (tryInjectQuickFill()) {
-        // 注入成功后停止观察
-        observer.disconnect();
-      }
+      tryInjectQuickFill();
+      tryInjectDeleteButton();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }

@@ -376,4 +376,23 @@
     }
   };
 
+  // ===== 3. 暴露删除 API（控制台可用：deleteOpp('关键词')） =====
+  window.deleteOpp = function(name) {
+    var d = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    var toDelete = [];
+    d.opportunities = d.opportunities.filter(function(o) {
+      if (o.name.indexOf(name) >= 0) { toDelete.push(o); return false; }
+      return true;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    // 同步删 Supabase
+    var uid = getUserId();
+    toDelete.forEach(function(o) {
+      api('DELETE', '/rest/v1/opportunities?id=eq.' + o.id)
+        .catch(function(e) { console.warn('deleteOpp Supabase fail:', o.id.slice(0,12), e.message); });
+    });
+    console.log('✅ 已删除', toDelete.length, '条商机:', toDelete.map(function(o) { return o.name; }).join(', '));
+    if (toDelete.length > 0) alert('已删除 ' + toDelete.length + ' 条商机，刷新页面生效');
+  };
+
 })();
