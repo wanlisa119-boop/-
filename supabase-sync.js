@@ -146,10 +146,10 @@
       // ★ 步骤1：从 state 里剔除"我"本地已删的记录
       state.opportunities = state.opportunities.filter(function(o) {
         if (o.owner === 'current') {
-          // 我的记录 → 必须在本地也存在，才保留
-          return localOppIdx.hasOwnProperty(o.id);
+          var keep = localOppIdx.hasOwnProperty(o.id);
+          console.log('🔍 [MERGE-FILTER]', o.id.slice(0,12), 'owner=current, in local?', keep);
+          return keep;
         }
-        // 别人的 → 保留
         return true;
       });
 
@@ -247,11 +247,16 @@
   function loadFromSupabase() {
     try {
       var uid = getUserId();
+      console.log('🔍 [LOAD] userId:', uid.slice(0,12));
 
       // 从 Supabase 拉数据
       var oppRes = syncGet('/rest/v1/opportunities?select=*');
       if (oppRes.status !== 200) return false;
       var apiOpps = JSON.parse(oppRes.responseText);
+      console.log('🔍 [LOAD] Supabase has', apiOpps.length, 'opps');
+      apiOpps.forEach(function(o) {
+        console.log('   Supabase opp:', o.id.slice(0,12), 'owner:', o.owner||'(empty)', 'name:', (o.name||'').slice(0,20));
+      });
 
       var cliRes = syncGet('/rest/v1/clients?select=*');
       if (cliRes.status !== 200) return false;
@@ -260,9 +265,21 @@
       // 读取本地状态
       var localStr = localStorage.getItem(STORAGE_KEY);
       var localState = localStr ? JSON.parse(localStr) : null;
+      if (localState && localState.opportunities) {
+        console.log('🔍 [LOAD] localStorage has', localState.opportunities.length, 'opps');
+        localState.opportunities.forEach(function(o) {
+          console.log('   Local opp:', o.id.slice(0,12), 'owner:', o.owner, 'name:', (o.name||'').slice(0,20));
+        });
+      } else {
+        console.log('🔍 [LOAD] localStorage: empty or no opps');
+      }
 
       // 合并
       var state = mergeState(apiOpps, apiClients, localState);
+      console.log('🔍 [LOAD] After merge:', state.opportunities.length, 'opps');
+      state.opportunities.forEach(function(o) {
+        console.log('   Merged opp:', o.id.slice(0,12), 'owner:', o.owner, 'name:', (o.name||'').slice(0,20));
+      });
 
       // 写回 localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -318,6 +335,7 @@
       if (window.__supabase_opp_ids) {
         window.__supabase_opp_ids.forEach(function(id) {
           if (!newOppIds.has(id)) {
+            console.log('🔍 [DELETE-DETECT] opp', id.slice(0,12), 'removed from state, sending DELETE');
             api('DELETE', '/rest/v1/opportunities?id=eq.' + id)
               .catch(function(e) { console.warn('⬇ del opp:', id.slice(0,12), e.message); });
           }
