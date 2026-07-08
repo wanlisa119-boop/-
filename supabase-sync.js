@@ -124,9 +124,10 @@
 
   // ===== 核心逻辑 =====
 
-  // ★ 更新后的合并规则：
-  // - 属于"我"的记录 → 以本地状态为准（增/删/改都听本地的）
-  // - 属于"别人"的记录 → 以 Supabase 为准
+  // ★ 合并规则：
+  //   1. 从 Supabase 拉所有数据
+  //   2. 属于"我"的记录 → 以本地为准（增删改都听本地的）
+  //   3. 属于"别人"的记录 → 以 Supabase 为准
   function mergeState(apiOpps, apiClients, localState) {
     var uid = getUserId();
     var state = {
@@ -136,51 +137,59 @@
       theme: (localState && localState.theme) ? localState.theme : 'auto'
     };
 
-    // 用本地"我的"记录覆盖 Supabase 的
     if (localState && localState.opportunities) {
-      var apiIdx = {};
-      state.opportunities.forEach(function(o) { apiIdx[o.id] = true; });
+      var apiOppIdx = {};
+      state.opportunities.forEach(function(o) { apiOppIdx[o.id] = o; });
+      var localOppIdx = {};
+      localState.opportunities.forEach(function(o) { localOppIdx[o.id] = o; });
 
+      // ★ 步骤1：从 state 里剔除"我"本地已删的记录
+      state.opportunities = state.opportunities.filter(function(o) {
+        if (o.owner === 'current') {
+          // 我的记录 → 必须在本地也存在，才保留
+          return localOppIdx.hasOwnProperty(o.id);
+        }
+        // 别人的 → 保留
+        return true;
+      });
+
+      // ★ 步骤2：用本地版本的"我"覆盖
+      state.opportunities = state.opportunities.map(function(o) {
+        if (o.owner === 'current' && localOppIdx[o.id]) {
+          return localOppIdx[o.id];
+        }
+        return o;
+      });
+
+      // ★ 步骤3：本地新增的"我"（Supabase 还没有的）
       localState.opportunities.forEach(function(localOpp) {
-        if (localOpp.owner === 'current') {
-          // "我的"记录：用本地的（本地删了就是删了，本地改了就是改了）
-          if (apiIdx[localOpp.id]) {
-            // 替换 Supabase 的版本为本地版本
-            for (var i = 0; i < state.opportunities.length; i++) {
-              if (state.opportunities[i].id === localOpp.id) {
-                state.opportunities[i] = localOpp;
-                break;
-              }
-            }
-          } else {
-            // 本地有但 Supabase 没有 → 新增未同步的
-            state.opportunities.push(localOpp);
-          }
-        } else if (!apiIdx[localOpp.id]) {
-          // 别人的记录但本地有 → 保留（可能是刚从 Supabase 拉的）
+        if (localOpp.owner === 'current' && !apiOppIdx[localOpp.id]) {
           state.opportunities.push(localOpp);
         }
       });
     }
 
-    // 同样的逻辑处理客户
+    // 同样处理客户
     if (localState && localState.clients) {
       var apiCliIdx = {};
-      state.clients.forEach(function(c) { apiCliIdx[c.id] = true; });
+      state.clients.forEach(function(c) { apiCliIdx[c.id] = c; });
+      var localCliIdx = {};
+      localState.clients.forEach(function(c) { localCliIdx[c.id] = c; });
 
+      state.clients = state.clients.filter(function(c) {
+        if (c.owner === 'current') {
+          return localCliIdx.hasOwnProperty(c.id);
+        }
+        return true;
+      });
+      state.clients = state.clients.map(function(c) {
+        if (c.owner === 'current' && localCliIdx[c.id]) {
+          return localCliIdx[c.id];
+        }
+        return c;
+      });
       localState.clients.forEach(function(localCli) {
-        if (localCli.owner === 'current' || !localCli.owner) {
-          if (apiCliIdx[localCli.id]) {
-            for (var i = 0; i < state.clients.length; i++) {
-              if (state.clients[i].id === localCli.id) {
-                state.clients[i] = localCli;
-                break;
-              }
-            }
-          } else {
-            state.clients.push(localCli);
-          }
-        } else if (!apiCliIdx[localCli.id]) {
+        if (localCli.owner === 'current' && !apiCliIdx[localCli.id]) {
           state.clients.push(localCli);
         }
       });
