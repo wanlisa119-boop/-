@@ -22,24 +22,22 @@
 
   // ===== HTTP 请求 =====
   function api(method, path, body) {
-    return new Promise(function(resolve, reject) {
-      var xhr = new XMLHttpRequest();
-      xhr.open(method, SUPABASE_URL + path, true);
-      xhr.setRequestHeader('apikey', ANON_KEY);
-      xhr.setRequestHeader('Authorization', 'Bearer ' + ANON_KEY);
-      if (body) {
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates');
-      }
-      xhr.timeout = 15000;
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState !== 4) return;
-        if (xhr.status >= 200 && xhr.status < 300) resolve(xhr);
-        else reject(new Error(xhr.status + ' ' + (xhr.responseText || '').slice(0, 120)));
-      };
-      xhr.onerror = function() { reject(new Error('NET_FAIL')); };
-      xhr.ontimeout = function() { reject(new Error('TIMEOUT')); };
-      xhr.send(body ? JSON.stringify(body) : null);
+    var url = SUPABASE_URL + path;
+    // 用 on_conflict 代替 Prefer header 实现 upsert
+    if (method === 'POST' && body) {
+      url += (path.indexOf('?') >= 0 ? '&' : '?') + 'on_conflict=id';
+    }
+    return fetch(url, {
+      method: method,
+      headers: {
+        'apikey': ANON_KEY,
+        'Authorization': 'Bearer ' + ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function(r) {
+      if (!r.ok) throw new Error(r.status + ' ' + (r.statusText || ''));
+      return r;
     });
   }
 
