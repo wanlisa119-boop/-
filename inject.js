@@ -1,12 +1,13 @@
 // ==========================================
-// 快捷填写增强脚本 — 粘贴 + 语音 + 智能填充
+// 快捷填写增强脚本 v3 — 粘贴 + 智能填充 + 删除按钮
 // ==========================================
 (function() {
   'use strict';
 
-  // 注入自定义样式
+  // 注入自定义样式（含隐藏左滑删除）
   const style = document.createElement('style');
   style.textContent = `
+    /* 快捷填写样式 */
     .quick-fill-section {
       background: var(--bg-card);
       box-shadow: var(--shadow-card);
@@ -15,410 +16,201 @@
       margin-bottom: 20px;
     }
     .quick-fill-section .qf-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
     }
     .quick-fill-section .qf-header h3 {
-      font-size: 17px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin: 0;
+      font-size: 17px; font-weight: 600; color: var(--text-primary); margin: 0;
     }
     .quick-fill-section .qf-header .qf-badge {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: rgba(0,122,255,0.12);
-      color: #007AFF;
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: rgba(0,122,255,0.12); color: #007AFF;
     }
     .qf-textarea {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 14px;
-      line-height: 1.6;
-      resize: vertical;
-      min-height: 80px;
-      background: var(--bg-secondary);
-      color: var(--text-body);
-      border: none;
-      outline: none;
-      box-sizing: border-box;
+      width: 100%; padding: 12px; border-radius: 10px; font-size: 14px;
+      line-height: 1.6; resize: vertical; min-height: 80px;
+      background: var(--bg-secondary); color: var(--text-body);
+      border: none; outline: none; box-sizing: border-box;
       font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
     }
-    .qf-textarea:focus {
-      box-shadow: 0 0 0 2px rgba(0,122,255,0.3);
-    }
-    .qf-toolbar {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-      flex-wrap: wrap;
-    }
+    .qf-textarea:focus { box-shadow: 0 0 0 2px rgba(0,122,255,0.3); }
+    .qf-toolbar { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
     .qf-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: var(--bg-secondary);
-      color: var(--text-body);
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+      border-radius: 20px; font-size: 13px; font-weight: 500; border: none;
+      cursor: pointer; transition: all 0.2s;
+      background: var(--bg-secondary); color: var(--text-body);
     }
-    .qf-btn:active {
-      transform: scale(0.95);
+    .qf-btn:active { transform: scale(0.95); }
+    .qf-btn.primary { background: #007AFF; color: #fff; }
+    .qf-btn.primary:disabled { opacity: 0.4; }
+    .qf-tips { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.4; }
+
+    /* 隐藏左滑删除（不可靠的手势操作） */
+    div[style*="var(--danger)"] { visibility: hidden !important; pointer-events: none !important; }
+
+    /* 我们的删除按钮样式 */
+    .hermes-delete-btn-outer {
+      width: 100%; padding: 0 20px; box-sizing: border-box; text-align: center;
     }
-    .qf-btn.primary {
-      background: #007AFF;
-      color: #fff;
-    }
-    .qf-btn.primary:disabled {
-      opacity: 0.4;
-    }
-    .qf-btn.danger {
-      background: rgba(255,59,48,0.12);
-      color: #FF3B30;
-    }
-    .qf-btn.recording {
-      background: rgba(255,59,48,0.2);
-      color: #FF3B30;
-      animation: qf-pulse 1s infinite;
-    }
-    @keyframes qf-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(255,59,48,0); }
-    }
-    .qf-extract-result {
-      margin-top: 8px;
-      padding: 8px 12px;
-      background: rgba(52,199,89,0.1);
-      border-radius: 8px;
-      font-size: 12px;
-      color: var(--text-secondary);
-      display: none;
-    }
-    .qf-extract-result.show {
-      display: block;
-    }
-    .qf-tips {
-      font-size: 11px;
-      color: var(--text-tertiary);
-      margin-top: 6px;
-      line-height: 1.4;
+    .hermes-delete-btn-inner {
+      display: inline-block; margin: 12px 0 20px; padding: 10px 24px;
+      border-radius: 10px; border: 1px solid rgba(255,59,48,0.3);
+      background: rgba(255,59,48,0.06); color: #FF3B30;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
     }
   `;
   document.head.appendChild(style);
 
-  // ===== 智能解析函数 =====
+  // ===== 智能解析 =====
   function smartParse(text) {
     const result = { name: '', client: '', amount: '', stage: '' };
     const lines = text.split('\n').filter(l => l.trim());
-
     for (const line of lines) {
       const t = line.trim();
-
-      // 客户/公司
       const clientMatch = t.match(/(?:客户|公司|甲方|企业)(?:\s*[:：])?\s*(.+)/);
       if (clientMatch && !result.client) result.client = clientMatch[1].trim();
-
-      // 金额
       const amtMatch = t.match(/(?:金额|预算|合同额|报价)(?:\s*[:：])?\s*(?:约|大概|预计)?\s*(\d+(?:[\.\,]\d+)?)\s*(?:万|万元|w|W)?/);
       if (amtMatch) result.amount = amtMatch[1].replace(',', '');
-
-      // 项目/商机名称
       const nameMatch = t.match(/(?:项目|商机|名称|方案)(?:\s*[:：])?\s*(.+)/);
       if (nameMatch && !result.name) result.name = nameMatch[1].trim();
-
-      // 阶段
       const stages = ['初步接触', '方案交流', '商务谈判', '赢单', '输单'];
-      for (const s of stages) {
-        if (t.includes(s)) { result.stage = s; break; }
-      }
-
-      // 如果没有明确标记，第一行可能是名称
-      if (!result.name && line === lines[0]) {
-        result.name = t;
-      }
+      for (const s of stages) { if (t.includes(s)) { result.stage = s; break; } }
+      if (!result.name && line === lines[0]) result.name = t;
     }
-
     return result;
   }
 
-  // ===== 检查并注入到表单 =====
-  let injectionTimer = null;
-
+  // ===== 快捷填写注入 =====
   function tryInjectQuickFill() {
-    // 找到表单的滚动内容区 (flex-1 overflow-y-auto)
-    const formContent = document.querySelector('.fixed.inset-0.z-\\[80\\] .flex-1.overflow-y-auto');
-    if (!formContent) return false;
+    const formContent = document.querySelector('.fixed.inset-0.z-\\\\[80\\\\] .flex-1.overflow-y-auto');
+    if (!formContent) return;
+    if (formContent.querySelector('.quick-fill-section')) return;
 
-    // 检查是否已经注入过
-    if (formContent.querySelector('.quick-fill-section')) return true;
-
-    // 找到"基本信息"section
     const sections = formContent.querySelectorAll('.space-y-5 > div');
-    if (sections.length === 0) return false;
+    if (sections.length === 0) return;
 
-    const basicSection = sections[0]; // 基本信息是第一个section
-
-    // 创建快捷填写区域
     const quickFill = document.createElement('div');
     quickFill.className = 'quick-fill-section';
     quickFill.innerHTML = `
       <div class="qf-header">
         <h3>📋 快捷填写</h3>
-        <span class="qf-badge">粘贴 · 语音</span>
+        <span class="qf-badge">粘贴 · 智能填充</span>
       </div>
-      <textarea class="qf-textarea" placeholder="📌 参考格式：把聊天记录/邮件原文粘贴在这里&#10;&#10;示例：&#10;客户：华润数字科技有限公司&#10;项目：能源管理数字化升级项目二期&#10;金额：320万&#10;阶段：商务谈判&#10;联系人：李总"></textarea>
+      <textarea class="qf-textarea" placeholder="📌 把聊天记录/邮件原文粘贴在这里&#10;&#10;示例：&#10;客户：华润数字科技有限公司&#10;项目：能源管理数字化升级项目二期&#10;金额：320万&#10;阶段：商务谈判&#10;联系人：李总"></textarea>
       <div class="qf-extract-result"></div>
       <div class="qf-toolbar">
         <button class="qf-btn" data-action="paste">📋 粘贴</button>
-        <!-- 语音按钮已隐藏，手机端请使用键盘上的麦克风 -->
         <button class="qf-btn primary" data-action="fill" disabled>✨ 智能填充</button>
         <button class="qf-btn" data-action="clear" style="margin-left:auto;">清空</button>
       </div>
       <div class="qf-tips">💡 支持粘贴微信聊天记录、邮件原文，自动提取客户名、项目名、金额、阶段</div>
     `;
 
-    // 注入到基本信息之前
     formContent.insertBefore(quickFill, formContent.firstChild);
 
-    // ===== 绑定事件 =====
     const textarea = quickFill.querySelector('.qf-textarea');
     const fillBtn = quickFill.querySelector('[data-action="fill"]');
     const extractResult = quickFill.querySelector('.qf-extract-result');
-    let recognition = null;
-    let isRecording = false;
-    const voiceBtn = quickFill.querySelector('[data-action="voice"]');
 
-    // 输入检测 - 有内容时启用填充按钮
-    textarea.addEventListener('input', () => {
-      fillBtn.disabled = !textarea.value.trim();
-    });
+    textarea.addEventListener('input', () => { fillBtn.disabled = !textarea.value.trim(); });
 
-    // 粘贴按钮
     quickFill.querySelector('[data-action="paste"]').addEventListener('click', async () => {
       try {
         const text = await navigator.clipboard.readText();
-        if (text) {
-          textarea.value = text;
-          textarea.dispatchEvent(new Event('input'));
-          extractResult.textContent = '✅ 已粘贴 ' + text.length + ' 个字符';
-          extractResult.className = 'qf-extract-result show';
-          setTimeout(() => { extractResult.className = 'qf-extract-result'; }, 2000);
-        }
-      } catch (err) {
-        extractResult.textContent = '⚠️ 无法读取剪贴板，请手动 Ctrl+V';
-        extractResult.className = 'qf-extract-result show';
-      }
+        if (text) { textarea.value = text; textarea.dispatchEvent(new Event('input')); }
+      } catch (err) {}
     });
 
-    // 语音输入按钮 - 兼容多种浏览器
-    voiceBtn.addEventListener('click', () => {
-      // 检测可用的语音识别API
-      const SpeechRecognitionAPI = window.SpeechRecognition || 
-                                    window.webkitSpeechRecognition ||
-                                    window.mozSpeechRecognition ||
-                                    window.msSpeechRecognition;
-
-      if (!SpeechRecognitionAPI) {
-        extractResult.textContent = '⚠️ 当前浏览器不支持语音输入。如需使用，请用手机Chrome/Edge浏览器打开';
-        extractResult.className = 'qf-extract-result show';
-        return;
-      }
-
-      if (isRecording) {
-        recognition.stop();
-        return;
-      }
-
-      try {
-        recognition = new SpeechRecognitionAPI();
-        recognition.lang = 'zh-CN';
-        recognition.continuous = true;  // 连续识别
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-          isRecording = true;
-          voiceBtn.className = 'qf-btn recording';
-          voiceBtn.textContent = '⏹ 点击停止';
-          extractResult.textContent = '🎤 正在录音，请说话… 说完点击"停止"';
-          extractResult.className = 'qf-extract-result show';
-        };
-
-        recognition.onresult = (event) => {
-          let finalText = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              finalText += event.results[i][0].transcript;
-            }
-          }
-          if (finalText) {
-            textarea.value += finalText;
-            textarea.dispatchEvent(new Event('input'));
-            textarea.scrollTop = textarea.scrollHeight;
-          }
-        };
-
-        recognition.onend = () => {
-          isRecording = false;
-          voiceBtn.className = 'qf-btn';
-          voiceBtn.textContent = '🎤 语音输入';
-          if (textarea.value) {
-            extractResult.textContent = '✅ 语音识别完成';
-            extractResult.className = 'qf-extract-result show';
-            setTimeout(() => { extractResult.className = 'qf-extract-result'; }, 2000);
-          }
-        };
-
-        recognition.onerror = (event) => {
-          isRecording = false;
-          voiceBtn.className = 'qf-btn';
-          voiceBtn.textContent = '🎤 语音输入';
-          
-          let errMsg = '⚠️ 语音识别失败';
-          if (event.error === 'not-allowed') {
-            errMsg = '⚠️ 录音权限被拒绝，请在浏览器设置中允许麦克风权限';
-          } else if (event.error === 'no-speech') {
-            errMsg = '⚠️ 未检测到语音，请检查麦克风是否正常';
-          } else if (event.error === 'network') {
-            errMsg = '⚠️ 语音识别网络连接失败，请检查网络';
-          } else if (event.error === 'aborted') {
-            return; // 用户主动停止，不显示错误
-          }
-          extractResult.textContent = errMsg;
-          extractResult.className = 'qf-extract-result show';
-        };
-
-        recognition.start();
-      } catch (err) {
-        extractResult.textContent = '⚠️ 语音功能启动失败: ' + err.message;
-        extractResult.className = 'qf-extract-result show';
-      }
-    });
-
-    // 智能填充按钮
     fillBtn.addEventListener('click', () => {
       const parsed = smartParse(textarea.value);
-
-      // 找出表单中的各个输入框
       const inputs = formContent.querySelectorAll('input, textarea');
       const formInputs = Array.from(inputs);
 
-      // 商机名称
       const nameInput = formInputs.find(el => el.placeholder === '请输入商机名称');
       if (parsed.name && nameInput) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(nameInput, parsed.name);
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(nameInput, parsed.name);
         nameInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
-
-      // 金额
       const amountInput = formInputs.find(el => el.placeholder === '请输入金额');
       if (parsed.amount && amountInput) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(amountInput, parsed.amount);
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(amountInput, parsed.amount);
         amountInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
-
-      // 客户搜索框
       const clientInput = formInputs.find(el => el.placeholder && el.placeholder.includes('搜索或输入客户'));
       if (parsed.client && clientInput) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(clientInput, parsed.client);
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(clientInput, parsed.client);
         clientInput.dispatchEvent(new Event('input', { bubbles: true }));
         clientInput.dispatchEvent(new Event('focus', { bubbles: true }));
       }
-
-      // 跟进阶段 - 点选对应的阶段按钮
       if (parsed.stage) {
         const stageBtns = formContent.querySelectorAll('.gap-2.overflow-x-auto button');
-        stageBtns.forEach(btn => {
-          if (btn.textContent.trim() === parsed.stage) {
-            btn.click();
-          }
-        });
+        stageBtns.forEach(btn => { if (btn.textContent.trim() === parsed.stage) btn.click(); });
       }
-
-      // 显示结果
-      const filled = [];
-      if (parsed.name) filled.push('✅ 商机名称');
-      if (parsed.amount) filled.push('💰 金额');
-      if (parsed.client) filled.push('🏢 客户');
-      if (parsed.stage) filled.push('📌 阶段');
-      extractResult.textContent = filled.length > 0
-        ? '✨ 已自动填充: ' + filled.join(' · ')
-        : '⚠️ 未能识别到关键信息，请检查输入格式';
-      extractResult.className = 'qf-extract-result show';
-      setTimeout(() => { extractResult.className = 'qf-extract-result'; }, 3000);
     });
 
-    // 清空按钮
     quickFill.querySelector('[data-action="clear"]').addEventListener('click', () => {
-      textarea.value = '';
-      fillBtn.disabled = true;
+      textarea.value = ''; fillBtn.disabled = true;
     });
-
-    return true;
   }
 
-  // ===== 注入删除按钮到商机卡片（编辑商机按钮下方） =====
+  // ===== 删除按钮注入（找到卡片标题h2后面插入） =====
   function tryInjectDeleteButton() {
-    var injected = false;
-    // 找所有包含"编辑商机"文本的按钮
-    var allBtns = document.querySelectorAll('button');
-    for (var i = 0; i < allBtns.length; i++) {
-      var btn = allBtns[i];
-      if (btn.textContent.indexOf('编辑商机') === -1) continue;
-      // 确保在卡片/弹窗里，不是导航栏
-      var card = btn.closest('.fixed') || btn.parentElement;
-      if (!card || card.querySelector('.hermes-delete-btn')) continue;
+    // 找所有 h2 标题（卡片里的"编辑商机"或"新建商机"）
+    var headings = document.querySelectorAll('h2');
+    for (var i = 0; i < headings.length; i++) {
+      var h = headings[i];
+      var txt = h.textContent.trim();
+      // 只在"编辑商机"卡片里加删除（不给"新建商机"加）
+      if (txt !== '编辑商机') continue;
+      
+      var card = h.closest('.fixed');
+      if (!card || card.querySelector('.hermes-delete-btn-outer')) continue;
 
-      var delBtn = document.createElement('button');
-      delBtn.className = 'hermes-delete-btn';
-      delBtn.textContent = '🗑 删除商机';
-      delBtn.style.cssText = 'display:block;margin:6px 0 0;padding:8px 20px;border-radius:8px;border:1px solid rgba(255,59,48,0.25);background:transparent;color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;';
-      
+      // 找商机名称（h2前面的元素可能是名称）
       var oppName = '';
-      var nameEl = card.querySelector('h2, h3, [class*=\"text-17\"], [class*=\"text-16\"]');
-      if (nameEl) oppName = nameEl.textContent.trim();
-      
+      var allText = card.querySelectorAll('h2, h3, div, span');
+      // 简单取卡片里第一个看起来像标题的文本
+      var nameH = card.querySelector('[class*="text-17"], [class*="text-16"], [class*="font-semibold"]');
+      if (nameH && nameH !== h) oppName = nameH.textContent.trim().split('\n')[0];
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'hermes-delete-btn-outer';
+      var delBtn = document.createElement('button');
+      delBtn.className = 'hermes-delete-btn-inner';
+      delBtn.textContent = '删除商机';
       delBtn.onclick = function() {
-        var name = oppName || '';
-        if (!name || !confirm('确定删除「' + name + '」？')) return;
+        var name = oppName || '这条';
+        if (!confirm('确定删除「' + name + '」？')) return;
         if (typeof window.deleteOpp === 'function') {
           window.deleteOpp(name);
         }
       };
-
-      btn.parentElement.appendChild(delBtn);
-      injected = true;
+      wrapper.appendChild(delBtn);
+      
+      // 插到 h2 的父容器后面（整个卡片内容区）
+      var parent = h.parentElement;
+      if (parent) parent.appendChild(wrapper);
     }
-    return injected;
   }
-
-  // 兜底：每2秒扫描一次
-  setInterval(tryInjectDeleteButton, 2000);
 
   // ===== 持续观察 =====
-  function startObserver() {
-    const observer = new MutationObserver(() => {
-      tryInjectQuickFill();
-      tryInjectDeleteButton();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+  const observer = new MutationObserver(() => {
+    tryInjectQuickFill();
+    tryInjectDeleteButton();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setInterval(function() {
+    tryInjectQuickFill();
+    tryInjectDeleteButton();
+  }, 2000);
 
   // 等 React 渲染完成后启动
-  if (document.readyState === 'complete') {
-    setTimeout(startObserver, 1000);
-  } else {
-    window.addEventListener('load', () => setTimeout(startObserver, 1000));
-  }
+  setTimeout(function() {
+    tryInjectQuickFill();
+    tryInjectDeleteButton();
+  }, 1500);
 })();
