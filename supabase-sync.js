@@ -401,15 +401,16 @@
     var d = JSON.parse(localStorage.getItem(STORAGE_KEY));
     var toDelete = [];
     d.clients = d.clients.filter(function(c) {
-      if (c.name.indexOf(name) >= 0) { toDelete.push(c); return false; }
+      if ((c.company||c.name||'').indexOf(name) >= 0) { toDelete.push(c); return false; }
       return true;
     });
+    if (toDelete.length === 0) { console.warn('deleteClient: no match for', name); return; }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
     toDelete.forEach(function(c) {
       api('DELETE', '/rest/v1/clients?id=eq.' + c.id)
         .catch(function(e) { console.warn('deleteClient Supabase fail:', c.id.slice(0,12), e.message); });
     });
-    console.log('✅ 已删除', toDelete.length, '个客户:', toDelete.map(function(c) { return c.name; }).join(', '));
+    console.log('✅ 已删除', toDelete.length, '个客户:', toDelete.map(function(c) { return c.company||c.name; }).join(', '));
     if (!skipReload) {
       setTimeout(function() { location.reload(); }, 500);
     }
@@ -421,7 +422,7 @@
     if (!d || !d.clients) return;
     var toDelete = [];
     d.clients = d.clients.filter(function(c) {
-      if (names.indexOf(c.name) >= 0) { toDelete.push(c); return false; }
+      if (names.indexOf(c.company||c.name||'') >= 0) { toDelete.push(c); return false; }
       return true;
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
