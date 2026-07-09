@@ -396,4 +396,21 @@
     setTimeout(function() { location.reload(); }, 500);
   };
 
+  // ===== 4. 暴露客户删除 API =====
+  window.deleteClient = function(name) {
+    var d = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    var toDelete = [];
+    d.clients = d.clients.filter(function(c) {
+      if (c.name.indexOf(name) >= 0) { toDelete.push(c); return false; }
+      return true;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    toDelete.forEach(function(c) {
+      api('DELETE', '/rest/v1/clients?id=eq.' + c.id)
+        .catch(function(e) { console.warn('deleteClient Supabase fail:', c.id.slice(0,12), e.message); });
+    });
+    console.log('✅ 已删除', toDelete.length, '个客户:', toDelete.map(function(c) { return c.name; }).join(', '));
+    setTimeout(function() { location.reload(); }, 500);
+  };
+
 })();
