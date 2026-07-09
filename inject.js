@@ -1,11 +1,11 @@
 // ==========================================
-// inject.js v6 — 快捷填写 + 删除按钮(最终版)
+// inject.js v7 — 快捷填写 + 删除按钮(卡片视图版)
 // ==========================================
 (function() {
   'use strict';
 
   var style = document.createElement('style');
-  style.textContent = '.quick-fill-section{background:var(--bg-card);box-shadow:var(--shadow-card);border-radius:12px;padding:16px;margin-bottom:20px}.quick-fill-section .qf-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}.quick-fill-section .qf-header h3{font-size:17px;font-weight:600;color:var(--text-primary);margin:0}.qf-textarea{width:100%;padding:12px;border-radius:10px;font-size:14px;line-height:1.6;resize:vertical;min-height:80px;background:var(--bg-secondary);color:var(--text-body);border:none;outline:none;box-sizing:border-box;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif}.qf-textarea:focus{box-shadow:0 0 0 2px rgba(0,122,255,0.3)}.qf-toolbar{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.qf-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;border:none;cursor:pointer;transition:all 0.2s;background:var(--bg-secondary);color:var(--text-body)}.qf-btn:active{transform:scale(0.95)}.qf-btn.primary{background:#007AFF;color:#fff}.qf-btn.primary:disabled{opacity:0.4}.qf-tips{font-size:11px;color:var(--text-tertiary);margin-top:6px;line-height:1.4}div[style*="var(--danger)"]{display:none!important}';
+  style.textContent = '.quick-fill-section{background:var(--bg-card);box-shadow:var(--shadow-card);border-radius:12px;padding:16px;margin-bottom:20px}.quick-fill-section .qf-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}.quick-fill-section .qf-header h3{font-size:17px;font-weight:600;color:var(--text-primary);margin:0}.qf-textarea{width:100%;padding:12px;border-radius:10px;font-size:14px;line-height:1.6;resize:vertical;min-height:80px;background:var(--bg-secondary);color:var(--text-body);border:none;outline:none;box-sizing:border-box;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif}.qf-textarea:focus{box-shadow:0 0 0 2px rgba(0,122,255,0.3)}.qf-toolbar{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.qf-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;border:none;cursor:pointer;transition:all 0.2s;background:var(--bg-secondary);color:var(--text-body)}.qf-btn:active{transform:scale(0.95)}.qf-btn.primary{background:#007AFF;color:#fff}.qf-btn.primary:disabled{opacity:0.4}.qf-tips{font-size:11px;color:var(--text-tertiary);margin-top:6px;line-height:1.4}button[style*="var(--danger)"]{display:none!important}';
   document.head.appendChild(style);
 
   // ===== 快捷填写 =====
@@ -37,30 +37,46 @@
     qf.querySelector('[data-action="clear"]').addEventListener('click', function(){ta.value='';fb.disabled=true});
   }
 
-  // ===== 删除按钮：找到"编辑商机"h2标题 =====
+  // ===== 删除按钮：找到展开卡片中的"编辑商机"按钮，在其下方添加"删除商机" =====
   function tryInjectDeleteButton() {
-    var h2s = document.querySelectorAll('h2');
-    for (var i = 0; i < h2s.length; i++) {
-      var txt = h2s[i].textContent.trim();
-      if (txt.indexOf('编辑商机') < 0) continue;
-      var parent = h2s[i].parentElement;
-      if (!parent || parent.querySelector('.hermes-delbtn')) continue;
-      // 只在卡片视图注入（没有输入框），不在编辑表单注入
-      if (parent.querySelector('input, textarea')) continue;
-      
+    // 如果页面有输入框 → 在编辑表单中，不注入
+    if (document.querySelector('input, textarea')) return;
+
+    var btns = document.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) {
+      var txt = btns[i].textContent || '';
+      // 匹配"编辑商机"（SVG图标可能把文字拆开）
+      if (txt.indexOf('编辑') < 0 || txt.indexOf('商机') < 0) continue;
+
+      var container = btns[i].parentElement;  // div.mt-4.pt-4.fade-in
+      if (!container || container.querySelector('.hermes-delbtn')) continue;
+
+      // 找到商机名称：向上找到卡片主体，再向下找 h3
+      var cardBody = container.parentElement;
+      var name = '';
+      if (cardBody) {
+        var h3 = cardBody.querySelector('h3');
+        if (h3) name = h3.textContent.trim();
+      }
+
+      console.log('🔍 [DEL] injecting delete button for:', name);
+
       var db = document.createElement('button');
       db.className = 'hermes-delbtn';
-      db.textContent = '删除商机';
-      db.style.cssText = 'display:block;width:100%;margin:12px 0;padding:10px;border-radius:10px;border:1px solid rgba(255,59,48,0.3);background:rgba(255,59,48,0.06);color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif';
-      db.onclick = function() {
-        if (!confirm('确定删除这条商机？')) return;
-        var name = '';
-        var n = parent.querySelector('h2, [class*="font-semibold"]');
-        if (n && n !== h2s[i]) name = n.textContent.trim().split('\n')[0];
-        if (window.deleteOpp) window.deleteOpp(name);
-      };
-      parent.appendChild(db);
-      console.log('🔍 [DEL] injected delete button into card');
+      db.textContent = '🗑 删除商机';
+      db.style.cssText = 'display:block;width:100%;margin:12px 0 0;padding:10px;border-radius:12px;border:1px solid rgba(255,59,48,0.25);background:rgba(255,59,48,0.05);color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif';
+
+      // 闭包捕获当前 name
+      (function(oppName) {
+        db.onclick = function(e) {
+          e.stopPropagation();  // 防止触发卡片折叠
+          if (!confirm('确定删除「' + oppName + '」？此操作不可撤销。')) return;
+          if (window.deleteOpp) window.deleteOpp(oppName);
+        };
+      })(name);
+
+      // 插入到编辑商机按钮后面
+      container.appendChild(db);
     }
   }
 
