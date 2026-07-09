@@ -3,6 +3,7 @@
 // ==========================================
 (function() {
   'use strict';
+  console.log('✅ inject.js v4 loaded');
 
   var style = document.createElement('style');
   style.textContent = `
