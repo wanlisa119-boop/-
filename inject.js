@@ -59,11 +59,9 @@
   }
 
   // ===== 客户池：单卡删除按钮 =====
-  var clientDelInjected = false;
   function tryInjectClientDeleteButtons() {
     var h1 = document.querySelector('h1');
     if (!h1 || h1.textContent.indexOf('客户资源池') < 0) return;
-    if (clientDelInjected) return;
 
     var cards = document.querySelectorAll('.spring-in');
     if (!cards.length) return;
@@ -81,15 +79,13 @@
       var db = document.createElement('button');
       db.className = 'hermes-client-del';
       db.title = '删除客户';
-      db.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-      db.style.cssText = 'flex-shrink:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--text-tertiary);cursor:pointer;border-radius:8px;margin-left:4px;transition:color 0.2s';
+      db.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+      db.style.cssText = 'flex-shrink:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--text-tertiary);cursor:pointer;border-radius:8px;margin-left:4px;transition:color 0.2s;-webkit-tap-highlight-color:transparent';
       db.onmouseenter = function(){db.style.color='#FF3B30'};
       db.onmouseleave = function(){db.style.color='var(--text-tertiary)'};
-      (function(n){ db.onclick = function(e){ e.stopPropagation(); if(!confirm('确定删除客户「'+n+'」？')) return; if(window.deleteClient) window.deleteClient(n); }; })(name);
+      (function(n){ db.onclick = function(e){ e.stopPropagation(); e.preventDefault(); if(!confirm('确定删除客户「'+n+'」？')) return; if(window.deleteClient) window.deleteClient(n); }; })(name);
       flexDiv.appendChild(db);
-      injected++;
     }
-    if (injected > 0) clientDelInjected = true;
   }
 
   // ===== 客户池：批量删除 =====
@@ -138,11 +134,11 @@
     confirmBtn.onclick = function() {
       if (selectedNames.length === 0) return;
       if (!confirm('确定删除 ' + selectedNames.length + ' 个客户？此操作不可撤销。')) return;
-      // Batch: modify localStorage directly, delete all, reload once
-      var d = JSON.parse(localStorage.getItem('opportunity-app-state-v1') || '{}');
-      d.clients = (d.clients || []).filter(function(c) { return selectedNames.indexOf(c.name) < 0; });
-      localStorage.setItem('opportunity-app-state-v1', JSON.stringify(d));
-      location.reload();
+      if (window.deleteClientsBulk) {
+        window.deleteClientsBulk(selectedNames.slice());
+      } else {
+        alert('删除功能未就绪，请刷新后重试');
+      }
     };
     header.appendChild(confirmBtn);
 
