@@ -161,14 +161,17 @@
   function tryInjectDeleteButton() {
     // 找所有 h2 标题（卡片里的"编辑商机"或"新建商机"）
     var headings = document.querySelectorAll('h2');
+    if (headings.length > 0) console.log('🔍 [DEL] found', headings.length, 'h2 elements:', Array.from(headings).map(function(h){return '"'+h.textContent.trim().slice(0,20)+'"'}).join(', '));
     for (var i = 0; i < headings.length; i++) {
       var h = headings[i];
       var txt = h.textContent.trim();
-      // 只在"编辑商机"卡片里加删除（不给"新建商机"加）
       if (txt !== '编辑商机') continue;
+      console.log('🔍 [DEL] matched h2 with "编辑商机"');
       
       var card = h.closest('.fixed');
-      if (!card || card.querySelector('.hermes-delete-btn-outer')) continue;
+      if (!card) { console.log('🔍 [DEL] no .fixed parent'); continue; }
+      if (card.querySelector('.hermes-delete-btn-outer')) { console.log('🔍 [DEL] already injected'); continue; }
+      console.log('🔍 [DEL] injecting delete button');
 
       // 找商机名称（h2前面的元素可能是名称）
       var oppName = '';
