@@ -157,18 +157,17 @@
     });
   }
 
-  // ===== 删除按钮注入（找到卡片标题h2后面插入） =====
+  // ===== 删除按钮注入 =====
   function tryInjectDeleteButton() {
-    // 找所有 h2 标题（卡片里的"编辑商机"或"新建商机"）
-    var headings = document.querySelectorAll('h2');
-    if (headings.length > 0) console.log('🔍 [DEL] found', headings.length, 'h2 elements:', Array.from(headings).map(function(h){return '"'+h.textContent.trim().slice(0,20)+'"'}).join(', '));
+    var headings = document.querySelectorAll('h1, h2, h3, [class*="text-17"], [class*="semibold"]');
+    console.log('🔍 [DEL] heading candidates:', headings.length);
     for (var i = 0; i < headings.length; i++) {
       var h = headings[i];
       var txt = h.textContent.trim();
-      if (txt !== '编辑商机') continue;
-      console.log('🔍 [DEL] matched h2 with "编辑商机"');
+      if (txt.indexOf('编辑商机') < 0) continue;
+      console.log('🔍 [DEL] found heading with "编辑商机":', txt);
       
-      var card = h.closest('.fixed');
+      var card = h.closest('.fixed, [class*="fixed"]');
       if (!card) { console.log('🔍 [DEL] no .fixed parent'); continue; }
       if (card.querySelector('.hermes-delete-btn-outer')) { console.log('🔍 [DEL] already injected'); continue; }
       console.log('🔍 [DEL] injecting delete button');
