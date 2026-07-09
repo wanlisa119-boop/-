@@ -376,7 +376,7 @@
     }
   };
 
-  // ===== 3. 暴露删除 API（控制台可用：deleteOpp('关键词')） =====
+  // ===== 3. 暴露删除 API =====
   window.deleteOpp = function(name) {
     var d = JSON.parse(localStorage.getItem(STORAGE_KEY));
     var toDelete = [];
@@ -384,16 +384,19 @@
       if (o.name.indexOf(name) >= 0) { toDelete.push(o); return false; }
       return true;
     });
+    if (toDelete.length === 0) { console.warn('deleteOpp: no match for', name); return; }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-    // 同步删 Supabase
-    var uid = getUserId();
-    toDelete.forEach(function(o) {
-      api('DELETE', '/rest/v1/opportunities?id=eq.' + o.id)
-        .catch(function(e) { console.warn('deleteOpp Supabase fail:', o.id.slice(0,12), e.message); });
+    // 等 Supabase 删完再刷新，杜绝时序问题
+    var deletions = toDelete.map(function(o) {
+      return api('DELETE', '/rest/v1/opportunities?id=eq.' + o.id)
+        .catch(function(e) { console.warn('deleteOpp fail:', o.id.slice(0,12), e.message); });
     });
     console.log('✅ 已删除', toDelete.length, '条商机:', toDelete.map(function(o) { return o.name; }).join(', '));
-    // 自动刷新页面
-    setTimeout(function() { location.reload(); }, 500);
+    // 等待最多 3 秒，超时也刷新
+    var done = false;
+    var reload = function() { if (!done) { done = true; location.reload(); } };
+    Promise.all(deletions).then(reload).catch(reload);
+    setTimeout(reload, 3000);
   };
 
   // ===== 4. 暴露客户删除 API =====
@@ -406,13 +409,16 @@
     });
     if (toDelete.length === 0) { console.warn('deleteClient: no match for', name); return; }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-    toDelete.forEach(function(c) {
-      api('DELETE', '/rest/v1/clients?id=eq.' + c.id)
-        .catch(function(e) { console.warn('deleteClient Supabase fail:', c.id.slice(0,12), e.message); });
+    var deletions = toDelete.map(function(c) {
+      return api('DELETE', '/rest/v1/clients?id=eq.' + c.id)
+        .catch(function(e) { console.warn('deleteClient fail:', c.id.slice(0,12), e.message); });
     });
     console.log('✅ 已删除', toDelete.length, '个客户:', toDelete.map(function(c) { return c.company||c.name; }).join(', '));
     if (!skipReload) {
-      setTimeout(function() { location.reload(); }, 500);
+      var done = false;
+      var reload = function() { if (!done) { done = true; location.reload(); } };
+      Promise.all(deletions).then(reload).catch(reload);
+      setTimeout(reload, 3000);
     }
   };
 
