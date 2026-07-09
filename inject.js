@@ -170,16 +170,19 @@
       cb.type = 'checkbox';
       cb.className = 'hermes-batch-cb';
       cb.style.cssText = 'flex-shrink:0;width:22px;height:22px;cursor:pointer;accent-color:#FF3B30;margin-right:8px';
-      var name = h3.textContent.trim();
-      cb.onchange = function() {
-        if (cb.checked) { selectedNames.push(name); }
-        else { selectedNames = selectedNames.filter(function(n){return n!==name}); }
-        if (confirmBtn) {
-          confirmBtn.textContent = '确认删除(' + selectedNames.length + ')';
-          confirmBtn.disabled = selectedNames.length === 0;
-          confirmBtn.style.opacity = selectedNames.length === 0 ? '0.4' : '1';
-        }
-      };
+      var clientName = h3.textContent.trim();
+      // 闭包捕获：每个 checkbox 独立绑定
+      (function(checkbox, name) {
+        checkbox.onchange = function() {
+          if (checkbox.checked) { selectedNames.push(name); }
+          else { selectedNames = selectedNames.filter(function(n){return n!==name}); }
+          if (confirmBtn) {
+            confirmBtn.textContent = '确认删除(' + selectedNames.length + ')';
+            confirmBtn.disabled = selectedNames.length === 0;
+            confirmBtn.style.opacity = selectedNames.length === 0 ? '0.4' : '1';
+          }
+        };
+      })(cb, clientName);
       flexDiv.insertBefore(cb, flexDiv.firstChild);
     }
   }
