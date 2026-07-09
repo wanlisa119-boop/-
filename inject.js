@@ -44,7 +44,9 @@
       var txt = h2s[i].textContent.trim();
       if (txt.indexOf('编辑商机') < 0) continue;
       var parent = h2s[i].parentElement;
-      if (!parent || parent.querySelector('.hermes-delbtn')) return;
+      if (!parent || parent.querySelector('.hermes-delbtn')) continue;
+      // 只在卡片视图注入（没有输入框），不在编辑表单注入
+      if (parent.querySelector('input, textarea')) continue;
       
       var db = document.createElement('button');
       db.className = 'hermes-delbtn';
