@@ -1,5 +1,5 @@
 // ==========================================
-// inject.js v5 — 快捷填写 + 删除按钮 (debug版)
+// inject.js v6 — 快捷填写 + 删除按钮(最终版)
 // ==========================================
 (function() {
   'use strict';
@@ -37,23 +37,34 @@
     qf.querySelector('[data-action="clear"]').addEventListener('click', function(){ta.value='';fb.disabled=true});
   }
 
-  // ===== 调试：列出所有按钮文字 =====
-  function dumpButtons() {
-    var btns = document.querySelectorAll('button');
-    var texts = [];
-    for (var i = 0; i < btns.length; i++) {
-      var t = btns[i].textContent.replace(/\s+/g,' ').trim();
-      if (t && t.length > 1 && t !== '保存' && t !== '取消' && texts.indexOf(t) < 0) {
-        texts.push(t);
-      }
+  // ===== 删除按钮：找到"编辑商机"h2标题 =====
+  function tryInjectDeleteButton() {
+    var h2s = document.querySelectorAll('h2');
+    for (var i = 0; i < h2s.length; i++) {
+      var txt = h2s[i].textContent.trim();
+      if (txt.indexOf('编辑商机') < 0) continue;
+      var parent = h2s[i].parentElement;
+      if (!parent || parent.querySelector('.hermes-delbtn')) return;
+      
+      var db = document.createElement('button');
+      db.className = 'hermes-delbtn';
+      db.textContent = '删除商机';
+      db.style.cssText = 'display:block;width:100%;margin:12px 0;padding:10px;border-radius:10px;border:1px solid rgba(255,59,48,0.3);background:rgba(255,59,48,0.06);color:#FF3B30;font-size:14px;font-weight:500;cursor:pointer;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif';
+      db.onclick = function() {
+        if (!confirm('确定删除这条商机？')) return;
+        var name = '';
+        var n = parent.querySelector('h2, [class*="font-semibold"]');
+        if (n && n !== h2s[i]) name = n.textContent.trim().split('\n')[0];
+        if (window.deleteOpp) window.deleteOpp(name);
+      };
+      parent.appendChild(db);
+      console.log('🔍 [DEL] injected delete button into card');
     }
-    console.log('🔍 [BTNS] unique button texts:', texts.join(' | '));
   }
 
-  // 每3秒打印一次
-  setInterval(dumpButtons, 3000);
-  setTimeout(dumpButtons, 2000);
+  setInterval(function(){tryInjectDeleteButton()}, 1500);
+  setTimeout(function(){tryInjectDeleteButton()}, 2000);
 
-  var obs = new MutationObserver(function() { tryInjectQuickFill(); });
+  var obs = new MutationObserver(function() { tryInjectQuickFill(); tryInjectDeleteButton(); });
   obs.observe(document.body, {childList: true, subtree: true});
 })();
