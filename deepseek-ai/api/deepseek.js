@@ -40,20 +40,17 @@ export default async function handler(req) {
 ${oppsText}`;
     } else if (action === "client-research") {
       const { company, industry, region, contactPerson } = payload;
-      systemPrompt = `你是一个企业商业情报分析专家。根据提供的客户信息，生成结构化的企业背景报告。只返回JSON，不要其他文字。`;
-      userPrompt = `请分析以下客户，返回JSON格式报告：
+      systemPrompt = `你是一个严谨的企业商业情报分析专家。只基于公开可验证的官方资料和权威新闻报道进行分析。如果某项信息无法从公开渠道确认，请明确注明"未找到相关公开信息"，严禁编造或推测。只返回JSON。`;
+      userPrompt = `请基于公开资料分析以下企业，返回JSON格式报告。信息必须来源于官方网站、年报、权威财经媒体等可验证渠道：
 {
-  "background": "企业背景介绍（100-200字）",
-  "strategy": "战略动态和发展方向（100-200字）",
-  "digitalNeeds": "数字化转型需求和痛点（100-200字）",
-  "contactAnalysis": "对接人分析及沟通建议（100-200字）"
+  "background": "企业背景介绍（100-200字，包含主营业务、规模、行业地位，需源自官方或权威来源）",
+  "strategy": "战略动态和发展方向（100-200字，包含近期战略举措、投资动向、市场布局，需源自公开新闻或公告）"
 }
 
 客户信息：
 - 公司：${company}
 - 行业：${industry || "未知"}
-- 地区：${region || "未知"}
-- 对接人：${contactPerson || "未知"}`;
+- 地区：${region || "未知"}`;
     } else {
       return new Response(JSON.stringify({ error: "未知操作" }), {
         status: 400,
